@@ -1,14 +1,12 @@
 # from openai import OpenAI
 # from openai import AzureOpenAI
 # from dotenv import load_dotenv
-# import os
+import os
 
 # load_dotenv()
 
 from dotenv import load_dotenv
-import os
-
-load_dotenv() 
+load_dotenv()
 
 # response = client.responses.create(
 #     model="gpt-4o-mini",

@@ -43,6 +43,8 @@ from langchain.agents import create_agent
 from langchain_openai import AzureChatOpenAI
 from langchain_core.tools import tool
 from langchain.tools import ToolRuntime
+from dotenv import load_dotenv
+load_dotenv()
 
 # ---------------- MEMORY CLASS ----------------
 class MemoryStore:
