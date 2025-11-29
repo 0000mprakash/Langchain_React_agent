@@ -18,9 +18,9 @@ load_dotenv()
 # ---------------- LLM SETUP ----------------
 llm = AzureChatOpenAI(
     api_key=os.getenv("api_key"),
-    api_version=os.getenv("api_version"),
-    azure_endpoint=os.getenv("azure_endpoint"),
-    deployment_name=os.getenv("deployment_name"),
+    api_version="2024-02-01",
+    azure_endpoint=os.getenv("azure_endpoint"),   # e.g. https://xxx.openai.azure.com/
+    azure_deployment="gpt-4o-mini", 
 )
 # -------------------------------------------
 

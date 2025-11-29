@@ -4,3 +4,6 @@ langchain_openai
 langchain-classic
 chromadb
 langchain_community 
+matplotlib
+pandas
+yt-dlp
