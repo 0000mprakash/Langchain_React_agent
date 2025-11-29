@@ -8,15 +8,15 @@ load_dotenv()
 
 llm = AzureChatOpenAI(
     api_key=os.getenv("api_key"),
-    api_version=os.getenv("api_version"),
-    azure_endpoint=os.getenv("azure_endpoint"),
-    deployment_name=os.getenv("deployment_name"),
+    api_version="2024-02-01",
+    azure_endpoint=os.getenv("azure_endpoint"),   # e.g. https://xxx.openai.azure.com/
+    azure_deployment="gpt-4o-mini", 
 )
 
 
 
 os.environ["LANGSMITH_TRACING"] = "true"
-os.environ["langsmith_api_key"] = getpass.getpass()
+os.environ["langsmith_api_key"] = os.getenv("langsmith_api_key")
 
 # --------------------------------Calender and Email Tools--------------------------------
 @tool
@@ -139,7 +139,7 @@ supervisor_agent = create_agent(
     system_prompt=SUPERVISOR_PROMPT,
 )
 
-query = "Schedule a team standup for tomorrow at 9am"
+query = input("Enter your message: ")
 
 for step in supervisor_agent.stream(
     {"messages": [{"role": "user", "content": query}]}
