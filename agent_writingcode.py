@@ -4,6 +4,7 @@ from langchain_openai import AzureChatOpenAI
 # from langchain.tools import Tool
 from langchain_core.tools import tool
 import subprocess
+from tavily import TavilyClient
 from typing import List
 import yt_dlp
 import webbrowser
@@ -99,6 +100,63 @@ def list_files_with_query(query: str) -> List[str]:
         return [f"Error searching for files: {str(e)}"]
     
 
+
+
+@tool
+def summarize_directory(directory: str = ".") -> dict:
+    """
+    Summarize all readable text files in the directory,
+    skipping .env files, and ignoring virtual environment
+    directories such as venv/ and .venv/.
+
+    Returns:
+        { filename: summary_text }
+    """
+    summaries = {}
+
+    # Directory names to skip
+    IGNORE_DIRS = {"venv", ".venv", "env", ".env"}  # Add more if needed
+
+    for root, dirs, files in os.walk(directory):
+        # Remove ignored directories from traversal
+        dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
+
+        for file in files:
+
+            # Skip .env and .env.* variants
+            if file == ".env" or file.startswith(".env."):
+                continue
+
+            filepath = os.path.join(root, file)
+
+            try:
+                # Binary file detection by extension
+                binary_exts = [
+                    ".png", ".jpg", ".jpeg", ".gif", ".pdf", ".zip", ".exe",
+                    ".dll", ".so", ".bin", ".db", ".sqlite", ".mp3", ".mp4"
+                ]
+                if any(file.lower().endswith(ext) for ext in binary_exts):
+                    continue
+
+                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read().strip()
+
+                if not content:
+                    continue
+
+                snippet = content[:500].replace("\n", " ")
+
+                summaries[file] = f"Summary snippet (first 500 chars): {snippet}"
+
+            except Exception as e:
+                summaries[file] = f"Error reading file: {str(e)}"
+
+    return summaries
+
+
+
+    
+
 @tool
 def summarize_files(file_list: str) -> str:
     """
@@ -144,6 +202,25 @@ def summarize_files(file_list: str) -> str:
 
 
 
+
+client = TavilyClient(api_key=os.environ["tavily_api_key"])
+
+@tool
+def web_search(query: str) -> str:
+    """
+    Search the web using Tavily and return summarized structured results.
+    Input: search query string.
+    Output: JSON string with results.
+    """
+    try:
+        res = client.search(query=query, max_results=5)
+        return str(res)
+    except Exception as e:
+        return f"Error performing web search: {e}"
+
+
+
+
 # ---------------- LLM SETUP ----------------
 llm = AzureChatOpenAI(
     api_key=os.getenv("api_key"),
@@ -154,7 +231,7 @@ llm = AzureChatOpenAI(
 # -------------------------------------------   
 agent_graph = create_agent(
     model=llm,
-    tools=[write_file, run_python,play_youtube_first,list_files_with_query,summarize_files]
+    tools=[write_file, run_python,play_youtube_first,list_files_with_query,summarize_files,web_search,summarize_directory]
 )
 
 
