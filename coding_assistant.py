@@ -4,6 +4,9 @@ from langchain_openai import AzureChatOpenAI
 # from langchain.tools import Tool
 from langchain_core.tools import tool
 import subprocess
+# Let the LLM produce the modified version
+from langchain_core.messages import HumanMessage
+from langchain_openai import AzureChatOpenAI
 # from tavily import TavilyClient
 import yt_dlp
 from typing import List
@@ -19,31 +22,41 @@ load_dotenv()
 @tool
 def modify_file(path: str, instructions: str) -> str:
     """
-    Modify an existing file by applying LLM-generated edit instructions. 
-    The tool reads the file, applies text-based edits, and writes back the result.
+    Safely modify an existing file using LLM-generated edits.
 
-    Input:
-        path (str): Path to the file to modify.
-        instructions (str): Natural language instructions describing what to change.
-            Example:
-                "Replace the function add() with a new version that includes error handling."
-                "Insert a new function called process_data() after the imports."
-                "Append a new class at the end of the file."
-    
-    Returns:
-        str: A summary of what was changed.
+    - Prevents ``` code fences from being written into the file.
+    - Validates the model’s output.
+    - Ensures only raw code is saved.
+    - Provides robust error messaging.
     """
     import os
+
+    # ------- Helpers -------
+    def strip_code_fences(text: str) -> str:
+        """Remove Markdown fences like ``` or ```python from model output."""
+        text = text.strip()
+
+        # Remove leading fence
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1]
+
+        # Remove trailing fence
+        if text.endswith("```"):
+            text = text.rsplit("\n", 1)[0]
+
+        return text.strip()
+
+    # ------------------------
 
     if not os.path.exists(path):
         return f"Error: File not found → {path}"
 
     try:
-        # Read existing content
+        # Read original code
         with open(path, "r") as f:
             original = f.read()
 
-        # Let the LLM produce the modified version
+        # ---------- LLM CALL ----------
         from langchain_core.messages import HumanMessage
         from langchain_openai import AzureChatOpenAI
 
@@ -55,24 +68,40 @@ def modify_file(path: str, instructions: str) -> str:
         )
 
         prompt = f"""
-You are a code-editing engine.
+You are a code-editing engine that outputs ONLY raw code.
 
-The user wants to modify this file:
+DO NOT:
+- Add ``` or ```python fences.
+- Add explanations, summaries, comments, or metadata.
+- Add "Here is your updated file:".
+- Wrap the code in any formatting.
+
+Your task:
+Modify the following file EXACTLY as instructed, returning ONLY the full, final code of the file.
 
 ----- ORIGINAL FILE START -----
 {original}
 ----- ORIGINAL FILE END -----
 
-Apply the following modification instructions:
-
+----- INSTRUCTIONS -----
 {instructions}
+----- END INSTRUCTIONS -----
 
-Return ONLY the full modified file content. No explanations.
+Return ONLY the modified file content. No fences. No prose.
 """
 
-        modified = llm.invoke([HumanMessage(content=prompt)]).content
+        response = llm.invoke([HumanMessage(content=prompt)]).content
+        modified = strip_code_fences(response)
 
-        # Write the modified file back
+        # Validate model output
+        if not modified or modified.strip() == "":
+            return "Error: LLM returned empty output — file NOT modified."
+
+        # Safety: avoid accidentally deleting entire file unless asked
+        if len(modified.strip()) < 5:
+            return "Error: Output suspiciously small — refusing to overwrite file."
+
+        # ---------- Write the modified file safely ----------
         with open(path, "w") as f:
             f.write(modified)
 
@@ -80,6 +109,7 @@ Return ONLY the full modified file content. No explanations.
 
     except Exception as e:
         return f"Error modifying file: {str(e)}"
+
 
 
 @tool
