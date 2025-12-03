@@ -9,3 +9,5 @@ pandas
 yt-dlp
 tavily-python
 youtube_dl
+pygame
+

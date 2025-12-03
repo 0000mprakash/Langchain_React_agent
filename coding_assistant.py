@@ -9,6 +9,7 @@ from langchain_core.messages import HumanMessage
 from langchain_openai import AzureChatOpenAI
 # from tavily import TavilyClient
 import yt_dlp
+import csv
 from typing import List
 import webbrowser
 from dotenv import load_dotenv
@@ -194,6 +195,68 @@ def play_top_youtube_video(query: str) -> str:
 
     except Exception as e:
         return f"Error searching YouTube: {str(e)}"
+    
+
+
+@tool
+def fetch_crypto_price(crypto_symbol: str) -> str:
+    """
+    Fetch the current price of a cryptocurrency using the CoinGecko API.
+    Args:
+        crypto_symbol: The symbol of the cryptocurrency (e.g., 'bitcoin', 'ethereum')
+    Returns:
+        A string with the current price in USD.
+    """
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={crypto_symbol}&vs_currencies=usd"
+    
+    try:
+        response = requests.get(url)
+        data = response.json()
+        
+        # Check if the response contains the cryptocurrency data
+        if crypto_symbol in data:
+            price = data[crypto_symbol]['usd']
+            return f"The current price of {crypto_symbol} is ${price} USD."
+        else:
+            return f"Error: Could not fetch data for {crypto_symbol}. Please check the symbol."
+
+    except Exception as e:
+        return f"Error fetching data: {str(e)}"
+
+
+@tool
+def create_or_append_csv(file_path: str, data: list) -> str:
+    """
+    Create a CSV file if it doesn't exist, or append data to an existing CSV file.
+    Args:
+        file_path: The path where the CSV file should be stored.
+        data: A list of rows to append to the CSV. Each row is a list of column values.
+    Returns:
+        A message indicating success or failure.
+    """
+    try:
+        # Check if the file exists. If not, create a new one.
+        file_exists = os.path.exists(file_path)
+
+        # Open the file in append mode
+        with open(file_path, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            
+            # If the file doesn't exist, write the header row first
+            if not file_exists:
+                # Assuming the first row in the data is the header row.
+                header = data[0] if data else []
+                if header:
+                    writer.writerow(header)  # Write the header
+
+            # Write the new data
+            for row in data:
+                writer.writerow(row)
+
+        return f"Data successfully {'appended' if file_exists else 'written'} to {file_path}."
+
+    except Exception as e:
+        return f"Error creating/appending to CSV: {str(e)}"
 
 #---------------------------------------------------
 
@@ -207,8 +270,11 @@ llm = AzureChatOpenAI(
 # -------------------------------------------   
 agent_graph = create_agent(
     model=llm,
-    tools=[write_file, run_python, list_files_with_query, modify_file, play_top_youtube_video],
-    system_prompt="You are a local AI Coding Assistant running directly on the user's machine. You have access to tools that let you read, write, and execute code files. Use these tools to help the user with their coding tasks efficiently and accurately. Always think step-by-step and use the tools when needed.",
+    tools=[write_file, run_python, list_files_with_query, modify_file, play_top_youtube_video,create_or_append_csv,fetch_crypto_price],
+    system_prompt="""You are a local AI Assistant running on the user's machine.
+You have tools to read/write files, create and append CSVs, execute code, and fetch cryptocurrency data.
+Use these tools whenever they help you solve the user’s request.
+Always think step-by-step, be accurate, and keep your responses concise""",
 )
 
 messa = input("How can Python Assitant Help You Today? ")
